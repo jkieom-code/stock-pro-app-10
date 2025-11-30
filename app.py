@@ -333,6 +333,7 @@ if mode == "Asset Terminal":
                 fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False, yaxis=dict(title=f'Price ({currency})'))
                 st.plotly_chart(fig, use_container_width=True)
 
+            # --- AI Analysis Tab (Now with Forecasts for ALL Assets) ---
             with tabs[1]:
                 fg_score, fg_label = get_fear_and_greed_proxy()
                 pos, neg, neu, news_label = analyze_news_sentiment(news)
@@ -349,6 +350,34 @@ if mode == "Asset Terminal":
                 if len(data) > sma_period:
                     report = generate_ai_report(ticker, current_price, data['SMA'].iloc[-1], data['RSI'].iloc[-1], fg_score, fg_label, news_label)
                     st.markdown(f"""<div class="ai-analysis-box">{report.replace(chr(10), '<br>')}</div>""", unsafe_allow_html=True)
+
+                # FORECAST SECTION (Restored for All Assets)
+                st.markdown("### 🔮 Trend Prediction (Linear Regression)")
+                st.info("Projecting future trend based on recent price action.")
+                if len(data) > 30:
+                    df_ml = data[['Close']].dropna().reset_index()
+                    df_ml['Ordinal'] = df_ml.index
+                    X = df_ml[['Ordinal']].values
+                    y = df_ml['Close'].values
+                    model = LinearRegression().fit(X, y)
+                    future_X = np.arange(df_ml['Ordinal'].iloc[-1] + 1, df_ml['Ordinal'].iloc[-1] + 31).reshape(-1, 1)
+                    future_pred = model.predict(future_X)
+                    
+                    # Generate Dates
+                    last_ts = df_ml.iloc[-1, 0] # Timestamp
+                    if interval == '1m': d = timedelta(minutes=1)
+                    elif interval == '5m': d = timedelta(minutes=5)
+                    elif interval == '1h': d = timedelta(hours=1)
+                    else: d = timedelta(days=1)
+                    future_dates = [last_ts + i*d for i in range(1, 31)]
+                    
+                    fig_pred = go.Figure()
+                    fig_pred.add_trace(go.Scatter(x=df_ml.iloc[:,0], y=y, name='History', line=dict(color='blue')))
+                    fig_pred.add_trace(go.Scatter(x=future_dates, y=future_pred, name='Forecast', line=dict(color='red', dash='dash')))
+                    fig_pred.update_layout(height=350, template="plotly_white", title="30-Period Price Forecast")
+                    st.plotly_chart(fig_pred, use_container_width=True)
+                else:
+                    st.warning("Not enough data for forecast.")
 
             with tabs[2]:
                 if news:
@@ -383,17 +412,16 @@ elif mode == "Media & News":
     
     with tv_col1:
         st.markdown("**Bloomberg TV (Global)**")
-        # Bloomberg's official YouTube Live URL (Standard)
         st.video("https://www.youtube.com/watch?v=dp8PhLsUcFE")
         
-        st.markdown("**Sky News (Business/Global)**")
+        st.markdown("**Sky News (Live)**")
         st.video("https://www.youtube.com/watch?v=9Auq9mYxFEE")
 
     with tv_col2:
         st.markdown("**CNA (Asia Markets)**")
         st.video("https://www.youtube.com/watch?v=XWq5kBlakcQ")
         
-        st.markdown("**ABC News (Australia/Global Business)**")
+        st.markdown("**ABC News Australia (Live)**")
         st.video("https://www.youtube.com/watch?v=W1ilCy6XrmI")
 
     st.markdown("---")
