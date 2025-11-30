@@ -95,14 +95,22 @@ st.markdown("""
 @st.cache_data(ttl=60)
 def get_stock_data(ticker, interval, period, start=None, end=None):
     try:
+        # 1. Primary Attempt
         if interval == "1d" and start and end:
             data = yf.download(ticker, start=start, end=end, interval=interval, progress=False)
         else:
             data = yf.download(ticker, period=period, interval=interval, progress=False)
         
-        # Fallback for weekends/holidays
-        if data.empty and period == "1d":
+        # 2. Fallback Logic (Crucial for Weekends/Market Holidays)
+        if (data.empty or len(data) < 2) and period == "1d":
             data = yf.download(ticker, period="5d", interval=interval, progress=False)
+            
+        # 3. Clean Data (Fix for "Bizarre" Charts)
+        # Drop rows where Volume is 0 (often indicates non-trading pre-market noise or weekend glitches)
+        if 'Volume' in data.columns:
+            data = data[data['Volume'] > 0]
+        # Drop NaN rows
+        data = data.dropna()
         
         return data
     except Exception as e:
@@ -330,10 +338,24 @@ if mode == "Asset Terminal":
                 if show_bb:
                     fig.add_trace(go.Scatter(x=data.index, y=data['BB_Upper'], line=dict(color='gray', width=1, dash='dot'), name='Upper BB'))
                     fig.add_trace(go.Scatter(x=data.index, y=data['BB_Lower'], line=dict(color='gray', width=1, dash='dot'), name='Lower BB'))
-                fig.update_layout(height=600, template="plotly_white", xaxis_rangeslider_visible=False, yaxis=dict(title=f'Price ({currency})'))
+                
+                # FIX for "Bizarre" Gaps: Hide Weekends on Intraday Charts
+                rangebreaks = []
+                if interval in ['1m', '5m', '1h', '1d']:
+                    rangebreaks.append(dict(bounds=["sat", "mon"])) # Hide weekends
+                
+                fig.update_layout(
+                    height=600, 
+                    template="plotly_white", 
+                    xaxis_rangeslider_visible=False, 
+                    yaxis=dict(title=f'Price ({currency})'),
+                    xaxis=dict(
+                        rangebreaks=rangebreaks,
+                        title='Time'
+                    )
+                )
                 st.plotly_chart(fig, use_container_width=True)
 
-            # --- AI Analysis Tab (Now with Forecasts for ALL Assets) ---
             with tabs[1]:
                 fg_score, fg_label = get_fear_and_greed_proxy()
                 pos, neg, neu, news_label = analyze_news_sentiment(news)
@@ -351,7 +373,7 @@ if mode == "Asset Terminal":
                     report = generate_ai_report(ticker, current_price, data['SMA'].iloc[-1], data['RSI'].iloc[-1], fg_score, fg_label, news_label)
                     st.markdown(f"""<div class="ai-analysis-box">{report.replace(chr(10), '<br>')}</div>""", unsafe_allow_html=True)
 
-                # FORECAST SECTION (Restored for All Assets)
+                # FORECAST SECTION (Universal)
                 st.markdown("### 🔮 Trend Prediction (Linear Regression)")
                 st.info("Projecting future trend based on recent price action.")
                 if len(data) > 30:
@@ -412,7 +434,7 @@ elif mode == "Media & News":
     
     with tv_col1:
         st.markdown("**Bloomberg TV (Global)**")
-        st.video("https://www.youtube.com/watch?v=dp8PhLsUcFE")
+        st.video("https://www.youtube.com/watch?v=iEpJwprxDdk")
         
         st.markdown("**Sky News (Live)**")
         st.video("https://www.youtube.com/watch?v=9Auq9mYxFEE")
@@ -422,7 +444,7 @@ elif mode == "Media & News":
         st.video("https://www.youtube.com/watch?v=XWq5kBlakcQ")
         
         st.markdown("**ABC News Australia (Live)**")
-        st.video("https://www.youtube.com/watch?v=W1ilCy6XrmI")
+        st.video("https://www.youtube.com/watch?v=iipR5yUp36o")
 
     st.markdown("---")
 
