@@ -437,7 +437,7 @@ elif mode == "Media & News":
         st.video("https://www.youtube.com/watch?v=iEpJwprxDdk")
         
         st.markdown("**Sky News (Live)**")
-        st.video("https://www.youtube.com/watch?v=9Auq9mYxFEE")
+        st.video("https://www.youtube.com/watch?v=YDvsBbKfLPA")
 
     with tv_col2:
         st.markdown("**CNA (Asia Markets)**")
